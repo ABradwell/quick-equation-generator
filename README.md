@@ -77,6 +77,20 @@ Click anywhere in the equation to place the caret and drag to select. In Visual 
 typeset preview is replaced by a one-line "Becomes f(x)" summary, since the editor is already
 typeset. While slots are still empty you see "Keep typing..." instead of an error.
 
+## Deployment (Vercel)
+
+The app is static files only (`public/`), so Vercel serves it with no install or build step.
+`vercel.json` sets this up and blocks common bot-probe paths (`.env`, `wp-admin`, `*.php`…).
+
+1. Import the repository at [vercel.com/new](https://vercel.com/new). Leave the framework
+   preset as **Other**; the settings in `vercel.json` take over.
+2. Deploy. Every push to `main` deploys to production and every pull request gets a preview.
+3. In **Project → Settings → Domains**, add the subdomain (for example
+   `equations.aidenbradwell.com`). If the domain's DNS is managed by Vercel this is
+   automatic; otherwise add a `CNAME` record pointing to `cname.vercel-dns.com`.
+
+`server.js` is only for local development and is not deployed.
+
 ## Project layout
 
 ```

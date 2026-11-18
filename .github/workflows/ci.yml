@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # No lockfile is committed yet, so the install can't be frozen.
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      # Go, Rust, Java and Python come with the runner image; tsc does not.
+      # The generator tests skip any language whose toolchain is missing.
+      - name: Install TypeScript compiler for generator tests
+        run: npm install --global typescript
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Tests (parser, editor, and compile-and-run for all five languages)
+        run: pnpm test
