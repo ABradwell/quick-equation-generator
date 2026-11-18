@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Type math the way you would in Desmos and get a standalone function in Python, TypeScript, Go, Rust or Java."
+    />
+    <title>Equation Converter</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232a6fdb'/%3E%3Ctext x='16' y='23.5' font-size='21' text-anchor='middle' fill='white' font-family='Georgia,serif' font-style='italic'%3Ef%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="top">
+        <div class="brand">
+          <span class="logo" aria-hidden="true">ƒ</span>
+          <div>
+            <h1>Equation Converter</h1>
+            <p>Type math like you would in Desmos. Get a function you can paste into code.</p>
+          </div>
+        </div>
+      </header>
+
+      <main class="main">
+        <section class="card entry" aria-label="Equation" data-mode="visual">
+          <div class="entry-head">
+            <span class="eyebrow" id="eq-label">Equation</span>
+            <div class="seg" id="mode" role="radiogroup" aria-label="Input mode">
+              <button
+                type="button"
+                role="radio"
+                aria-checked="true"
+                data-mode="visual"
+                tabindex="0"
+              >
+                Visual
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked="false"
+                data-mode="text"
+                tabindex="-1"
+              >
+                Text
+              </button>
+            </div>
+          </div>
+          <div class="palette" id="palette"></div>
+          <div class="field field-visual" id="field-visual">
+            <div id="editor" aria-describedby="status"></div>
+          </div>
+          <div class="field field-textbox" id="field-text" hidden>
+            <div class="mirror field-text" aria-hidden="true"><span id="mirror-text"></span></div>
+            <input
+              id="eq"
+              class="field-text"
+              type="text"
+              autocomplete="off"
+              autocapitalize="off"
+              autocorrect="off"
+              spellcheck="false"
+              placeholder="f(x) = x^2 + 2x + 1"
+              aria-labelledby="eq-label"
+              aria-describedby="status"
+            />
+          </div>
+          <p class="notice" id="notice" role="status" hidden></p>
+          <div class="signature" id="signature" aria-live="polite"></div>
+          <div class="preview" id="preview" aria-live="polite"></div>
+          <div class="status" id="status" role="status"></div>
+        </section>
+
+        <div class="workspace">
+          <section class="card code-card" aria-label="Generated code">
+            <div class="card-head">
+              <div class="tabs" id="tabs" role="tablist" aria-label="Language"></div>
+              <button type="button" class="btn" id="copy">Copy</button>
+            </div>
+            <pre class="code" id="code" tabindex="0"></pre>
+          </section>
+
+          <section class="card viz-card" aria-label="Preview">
+            <div class="card-head">
+              <h2 class="card-title" id="viz-title">Graph</h2>
+              <span class="card-note" id="viz-note"></span>
+            </div>
+            <div class="viz-body" id="viz-body"></div>
+          </section>
+        </div>
+
+        <details class="card help" id="help">
+          <summary>Syntax help</summary>
+          <div class="help-body">
+            <p class="help-lead">Click an example to try it.</p>
+            <div class="examples" id="examples"></div>
+            <ul class="tips">
+              <li>
+                <code>x^2</code>, <code>x^{n+1}</code> powers; <code>sqrt(x)</code>,
+                <code>\sqrt[3]{x}</code> roots
+              </li>
+              <li>
+                <code>a/b</code> or <code>\frac{a}{b}</code> fractions; <code>2x</code> and
+                <code>2sin x</code> multiply implicitly
+              </li>
+              <li>
+                <code>pi</code>, <code>tau</code>, <code>e</code>; Greek as <code>theta</code>,
+                <code>\theta</code> or θ; subscripts <code>x_1</code>, <code>v_{max}</code>
+              </li>
+              <li>
+                <code>|x|</code> absolute value; <code>\sum_{n=1}^{10} n^2</code> and
+                <code>\prod</code>
+              </li>
+              <li><code>{x&lt;0: -x, x}</code> piecewise: conditions first, default last</li>
+              <li>
+                Functions: sin cos tan asin acos atan atan2 sinh cosh tanh exp ln log log_2 min max
+                mod round floor ceil sign
+              </li>
+              <li>
+                <code>f(x, y) = …</code> names the function; <code>a = b</code> without a name is an
+                implicit curve
+              </li>
+            </ul>
+          </div>
+        </details>
+      </main>
+
+      <aside class="side card" aria-label="History">
+        <div class="card-head">
+          <h2 class="card-title">History</h2>
+          <button type="button" class="btn btn-quiet" id="clear-history">Clear</button>
+        </div>
+        <ul class="history" id="history"></ul>
+      </aside>
+    </div>
+  </body>
+</html>
