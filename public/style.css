@@ -67,10 +67,84 @@ html {
 
 body {
   margin: 0;
-  background: var(--bg);
+  background: #05070f;
   color: var(--text);
   font: 15px/1.5 var(--ui-font);
   -webkit-font-smoothing: antialiased;
+}
+
+/* ------------------------------------------------------------- space scene */
+
+/* Fixed layers behind the app: nebula glow, then two star fields that twinkle
+   out of phase. Pure CSS, no images. */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+body::before {
+  background:
+    radial-gradient(ellipse 60% 45% at 12% 8%, rgb(88 70 190 / 0.35), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 92% 30%, rgb(40 110 200 / 0.28), transparent 70%),
+    radial-gradient(ellipse 70% 50% at 70% 100%, rgb(170 60 140 / 0.22), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, #0b1024 0%, #05070f 100%);
+}
+
+body::after {
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, #fff, transparent),
+    radial-gradient(1px 1px at 120px 80px, rgb(255 255 255 / 0.8), transparent),
+    radial-gradient(1.5px 1.5px at 60px 160px, #fff, transparent),
+    radial-gradient(1px 1px at 170px 140px, rgb(200 220 255 / 0.9), transparent),
+    radial-gradient(1px 1px at 90px 40px, rgb(255 255 255 / 0.6), transparent),
+    radial-gradient(2px 2px at 230px 210px, rgb(255 240 220 / 0.9), transparent),
+    radial-gradient(1px 1px at 300px 60px, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 340px 290px, rgb(190 210 255 / 0.85), transparent),
+    radial-gradient(1px 1px at 260px 330px, rgb(255 255 255 / 0.7), transparent);
+  background-size: 380px 380px;
+  animation: twinkle 6s ease-in-out infinite alternate;
+}
+
+.app::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 40px 200px, #fff, transparent),
+    radial-gradient(1px 1px at 410px 90px, rgb(255 255 255 / 0.75), transparent),
+    radial-gradient(1.5px 1.5px at 520px 410px, rgb(210 225 255 / 0.9), transparent),
+    radial-gradient(1px 1px at 150px 470px, #fff, transparent),
+    radial-gradient(2px 2px at 600px 150px, rgb(255 235 215 / 0.85), transparent),
+    radial-gradient(1px 1px at 330px 560px, rgb(255 255 255 / 0.6), transparent);
+  background-size: 640px 640px;
+  animation: twinkle 9s ease-in-out -4s infinite alternate;
+}
+
+@keyframes twinkle {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after,
+  .app::before {
+    animation: none;
+  }
+}
+
+/* The header sits directly on the dark scene in both themes. */
+.top .brand p {
+  color: #aab3c5;
 }
 
 button,
@@ -101,6 +175,7 @@ input {
 
 .top {
   grid-area: top;
+  color: #eef1f8;
 }
 .main {
   grid-area: main;
