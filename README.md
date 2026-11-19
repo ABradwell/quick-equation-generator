@@ -81,6 +81,26 @@ Click anywhere in the equation to place the caret and drag to select. In Visual 
 typeset preview is replaced by a one-line "Becomes f(x)" summary, since the editor is already
 typeset. While slots are still empty you see "Keep typing..." instead of an error.
 
+## Physics notebook
+
+Below the editor is a notebook of 110 pre-built equations for space and physics work:
+kinematics, forces, energy, gravitation, orbital mechanics (vis-viva, Hohmann transfers,
+Kepler's equation), rocket propulsion (Tsiolkovsky, thrust, nozzle exhaust velocity),
+atmosphere and reentry, rotation, relativity, heat and radiation, and signals. Search it or
+filter by topic, and choose an equation to load it with worked example values in the Evaluate
+panel, for example Earth's escape velocity or a LEO to GEO transfer. Each card's **Symbols**
+list gives every parameter's meaning and SI unit.
+
+**Save current equation** keeps your own equations, with their Evaluate inputs, under
+**My equations** in the browser.
+
+Equations live in `src/lib/notebook/data.ts`. Physical constants (G, c, g₀, σ, R, k_B, h) are
+written as numbers, eccentricity is `ecc` because `e` is Euler's number, and mass flow rate is
+`mdot`. `test/notebook.test.ts` checks that every entry parses, survives the visual editor,
+generates code in every language, and reproduces a known reference value from its example.
+Equations were selected with reference to [physics.info](https://physics.info/equations/) and
+standard astrodynamics texts.
+
 ## Deployment (Vercel)
 
 The app is static files only. Vercel installs the dev dependencies, runs `npm run build` to
@@ -107,6 +127,7 @@ src/
   lib/evaluate.ts            reference evaluator (graph + tests)
   lib/render.ts              AST → typeset HTML preview
   lib/editor/                visual editor: model, latex, tree, view, palette, util
+  lib/notebook/              physics notebook: equation data, search, panel
   lib/generators/*.ts        AST → Python / TypeScript / Go / Rust / Java
 docs/AST.md                  AST format shared by all of the above
 docs/EDITOR.md               visual editor design
