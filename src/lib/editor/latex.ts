@@ -167,7 +167,22 @@ function lex(src: string, extraWords: string[]): Token[] {
   const extra = new Set(extraWords);
   const words = [...new Set([...extraWords, ...WORD_LIST])].sort((a, b) => b.length - a.length);
   const tokens: Token[] = [];
-  const push = (t: string, v?: string): number => tokens.push({ t, v });
+  // Subscripts are labels (v_{max}, a_{spin}), so their words stay letters instead of turning into
+  // functions or constants. One entry per open brace: true when it is (inside) a subscript.
+  const braces: boolean[] = [];
+  let subNext = false; // the last token was "_"
+  const inSub = () => braces[braces.length - 1] === true;
+  const letters = (word: string) => {
+    for (const ch of word) tokens.push({ t: 'letter', v: ch });
+  };
+  const push = (t: string, v?: string): number => {
+    if (t === '{') braces.push(subNext || inSub());
+    else if (t === '}') braces.pop();
+    // \sum_{...} is a lower limit and \log_{...} a base, not labels
+    const prev = tokens[tokens.length - 1]?.t;
+    subNext = t === '_' && prev !== 'bigop' && prev !== 'fn';
+    return tokens.push({ t, v });
+  };
   const numRe = /(\d+(\.\d*)?|\.\d+)/y;
   let i = 0;
   while (i < src.length) {
@@ -183,7 +198,15 @@ function lex(src: string, extraWords: string[]): Token[] {
       i += num[0].length;
       continue;
     }
+    if (/[A-Za-z]/.test(c) && inSub()) {
+      const word = /^[A-Za-z]+/.exec(src.slice(i))![0];
+      subNext = false;
+      letters(word);
+      i += word.length;
+      continue;
+    }
     if (/[A-Za-z]/.test(c)) {
+      subNext = false;
       while (i < src.length && /[A-Za-z]/.test(src[i])) {
         const word = words.find((w) => src.startsWith(w, i)) ?? src[i];
         const tok = classifyWord(word, extra);
@@ -204,6 +227,20 @@ function lex(src: string, extraWords: string[]): Token[] {
       const cmd = m[1];
       i += m[0].length;
       if (SKIP_COMMANDS.has(cmd)) continue;
+      if (inSub() && (FUNCTION_SET.has(cmd) || cmd in CONSTANTS)) {
+        // x_{\max} as written by older versions of the editor: the label "max"
+        subNext = false;
+        letters(cmd);
+        continue;
+      }
+      if (inSub() && (cmd === 'operatorname' || cmd === 'mathrm' || cmd === 'text')) {
+        const body = /^\s*\{\s*([A-Za-z0-9]+)\s*\}/.exec(src.slice(i));
+        if (!body) throw new ImportError(`Expected {name} after \\${cmd}`);
+        i += body[0].length;
+        subNext = false;
+        for (const ch of body[1]) tokens.push({ t: /\d/.test(ch) ? 'num' : 'letter', v: ch });
+        continue;
+      }
       if (cmd === 'left' || cmd === 'right') push(cmd);
       else if (cmd in COMMAND_OPS) push('op', COMMAND_OPS[cmd]);
       else if (cmd === 'frac' || cmd === 'dfrac' || cmd === 'tfrac') push('frac');

@@ -750,6 +750,18 @@ function parseExpr(
 }
 
 /** Parse a single expression (no "="). */
+/**
+ * Parse a value typed into a number box (the Evaluate panel). Unlike in an equation, `5.972e24`
+ * here is scientific notation, not 5.972·e·24.
+ */
+export function parseValue(src: string): Node {
+  const text = src.replace(
+    /(?<![\w.])(\d+\.?\d*|\.\d+)[eE]([+-]?\d+)(?![\w.])/g,
+    (_, mantissa: string, exponent: string) => `(${mantissa}*10^{${exponent}})`,
+  );
+  return parseExpression(text);
+}
+
 export function parseExpression(src: string): Node {
   const { left, right } = parseExpr(normalize(src));
   if (right) throw new ParseError('Unexpected "="');
