@@ -9,10 +9,13 @@ import type { Definition } from './lib/ast.ts';
 import { createPalette } from './lib/editor/palette.ts';
 import { isIncomplete } from './lib/editor/util.ts';
 import { createGraph, createContour, iterationCost, fmtValue } from './lib/graph.ts';
+import { createNotebook } from './lib/notebook/view.ts';
+import type { Notebook } from './lib/notebook/view.ts';
 
 const HISTORY_KEY = 'equation-converter:history';
 const LANG_KEY = 'equation-converter:language';
 const MODE_KEY = 'equation-converter:mode';
+const NOTEBOOK_KEY = 'equation-converter:notebook';
 const HISTORY_MAX = 50;
 const SAVE_DELAY_MS = 1000;
 const DEFAULT_EQUATION = 'f(x) = x^2 + 2x + 1';
@@ -67,6 +70,7 @@ const els = {
   history: $('#history'),
   clear: $<HTMLButtonElement>('#clear-history'),
   examples: $('#examples'),
+  notebook: $('#notebook'),
 };
 
 /** The element an event came from, narrowed to the closest match of `selector`. */
@@ -114,6 +118,7 @@ const state: {
 // Assigned once below, before anything reads it.
 let editor: Editor = null!;
 let loading = false; // true while code (not the user) fills the editor
+let notebook: Notebook | null = null; // assigned once the page is wired up
 
 /** The equation as a source string, whichever input mode is active. */
 const getSource = () => (state.mode === 'visual' && editor ? editor.getLatex() : els.input.value);
@@ -325,7 +330,12 @@ function scheduleSave() {
   }, SAVE_DELAY_MS);
 }
 
-function update({ save = true }: { save?: boolean } = {}): void {
+function update(opts: { save?: boolean } = {}): void {
+  updateEquation(opts);
+  notebook?.refresh();
+}
+
+function updateEquation({ save = true }: { save?: boolean } = {}): void {
   const raw = getSource();
   if (!raw.trim()) {
     clearTimeout(saveTimer);
@@ -508,10 +518,13 @@ function makeContour(): Viz {
   };
 }
 
+/** Values typed into the Evaluate panel, by parameter name. The notebook preloads examples here. */
+const evalValues = new Map<string, string>();
+
 function makeEval(): Viz {
   els.vizTitle.textContent = 'Evaluate';
   els.vizNote.textContent = '';
-  const values = new Map<string, string>();
+  const values = evalValues;
   let signature: string | null = null;
   let currentDef: Definition | null = null;
 
@@ -820,6 +833,47 @@ document.addEventListener('keydown', (e) => {
       els.input.select();
     }
   }
+});
+
+// ----------------------------------------------------------------- notebook
+
+/** The source string the user would recognise for the equation in the editor. */
+const currentText = (): string => {
+  const src = getSource().trim();
+  return state.alias.get(src) ?? src;
+};
+
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+
+notebook = createNotebook(els.notebook, {
+  typeset,
+  onPick(src, values) {
+    if (values) {
+      for (const [name, value] of Object.entries(values)) evalValues.set(name, value);
+      destroyViz(); // rebuild the Evaluate inputs with these values
+    }
+    setEquation(src);
+    els.entry.scrollIntoView({
+      behavior: reducedMotion.matches ? 'auto' : 'smooth',
+      block: 'start',
+    });
+  },
+  current: () =>
+    state.ok && state.def && state.okRaw === getSource()
+      ? {
+          src: currentText(),
+          name: state.def.name,
+          values: Object.fromEntries(
+            state.def.params.flatMap((p) => (evalValues.has(p) ? [[p, evalValues.get(p)!]] : [])),
+          ),
+        }
+      : null,
+  isCurrent: (src) => {
+    const raw = getSource().trim();
+    return src === raw || state.alias.get(raw) === src;
+  },
+  load: () => store.get(NOTEBOOK_KEY),
+  save: (raw) => store.set(NOTEBOOK_KEY, raw),
 });
 
 renderTabs();
