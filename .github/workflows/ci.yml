@@ -24,9 +24,8 @@ jobs:
         with:
           node-version: 24
 
-      # No lockfile is committed yet, so the install can't be frozen.
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Check formatting
         run: pnpm format:check

@@ -156,6 +156,9 @@ vite.config.ts.timestamp-*
 .nx/workspace-data
 .nx/migrate-runs
 
+# Vercel CLI project link
+.vercel
+
 # Equation converter
 test/.tmp/
 .DS_Store

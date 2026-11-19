@@ -83,7 +83,7 @@ typeset. While slots are still empty you see "Keep typing..." instead of an erro
 
 ## Deployment (Vercel)
 
-The app is static files only. Vercel installs the dev dependencies, runs `npm run build` to
+The app is static files only. Vercel installs the dev dependencies with pnpm (from `pnpm-lock.yaml`), runs `pnpm build` to
 compile `src/` into `public/`, and serves `public/`. `vercel.json` sets this up and blocks common bot-probe paths (`.env`, `wp-admin`, `*.php`…).
 
 1. Import the repository at [vercel.com/new](https://vercel.com/new). Leave the framework
