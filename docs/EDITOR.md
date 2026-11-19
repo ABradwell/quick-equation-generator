@@ -7,15 +7,15 @@ history) is unchanged: **the editor is just another way to produce the source st
 
 ## Files
 
-| File                           | Role                                                                      | DOM? |
-| ------------------------------ | ------------------------------------------------------------------------- | ---- |
-| `public/lib/editor/model.js`   | Tree, cursor, selection and every editing command                         | no   |
-| `public/lib/editor/latex.js`   | `toLatex(block)` and `fromLatex(string)`                                  | no   |
-| `public/lib/editor/view.js`    | Renders the tree, cursor, selection; keyboard, mouse, paste, mobile input | yes  |
-| `public/lib/editor/palette.js` | Button palette definitions + rendering; drives the editor or the text box | yes  |
-| `test/editor/*.test.js`        | `node:test` suites for model.js and latex.js                              | —    |
+| File                        | Role                                                                      | DOM? |
+| --------------------------- | ------------------------------------------------------------------------- | ---- |
+| `src/lib/editor/model.ts`   | Tree, cursor, selection and every editing command                         | no   |
+| `src/lib/editor/latex.ts`   | `toLatex(block)` and `fromLatex(string)`                                  | no   |
+| `src/lib/editor/view.ts`    | Renders the tree, cursor, selection; keyboard, mouse, paste, mobile input | yes  |
+| `src/lib/editor/palette.ts` | Button palette definitions + rendering; drives the editor or the text box | yes  |
+| `test/editor/*.test.ts`     | `node:test` suites for model.ts and latex.ts                              | —    |
 
-model.js and latex.js must not touch `document` or `window`, so they can be tested in Node.
+model.ts and latex.ts must not touch `document` or `window`, so they can be tested in Node.
 
 ## Model
 
@@ -42,7 +42,7 @@ The root is a Block. The editor state is `{ root, cursor, selection }` where `se
 either null or `{ block, start, end }` — a contiguous range of items inside one block
 (selections that cross structure boundaries are widened to the common block, like MathQuill).
 
-## LaTeX contract (`latex.js`)
+## LaTeX contract (`latex.ts`)
 
 `toLatex(root)` emits LaTeX the parser understands:
 
@@ -67,11 +67,11 @@ names (`theta`, `\theta`, `θ`), function words (`sin`, `\sin`, `\operatorname{s
 fractions on import). Returns `{ root, ok: true }` or `{ ok: false, error }` if it can't build a
 tree (e.g. unbalanced brackets) — the app then falls back to text mode.
 
-**Round-trip requirement:** for every fixture in `test/helpers/fixtures.js`,
+**Round-trip requirement:** for every fixture in `test/helpers/fixtures.ts`,
 `parseEquation(toLatex(fromLatex(src).root))` must evaluate to the same values as
 `parseEquation(src)` (use `loadFixtures()` + `evaluate` + `close`).
 
-## Editing commands (`model.js`)
+## Editing commands (`model.ts`)
 
 Expose a small class, e.g. `new MathModel()` / `model.load(root)`, with methods the view calls.
 Behaviour (Desmos is the reference):
@@ -81,7 +81,7 @@ Behaviour (Desmos is the reference):
 - **Auto-words**: after inserting a letter, if the letters immediately before the cursor end
   with a known word, replace them: function names (`sin cos tan sec csc cot asin acos atan
 arcsin arccos arctan sinh cosh tanh exp ln log min max abs floor ceil round sign mod atan2`)
-  → one `fn` atom; Greek names (`alpha … omega`, as in parser.js) → `greek` atom; `pi`,
+  → one `fn` atom; Greek names (`alpha … omega`, as in parser.ts) → `greek` atom; `pi`,
   `tau` → `const` atom; `sqrt` → a sqrt node with the cursor inside; `sum`/`prod` → a bigop with
   the cursor in `lower`; `nthroot` → sqrt with index. Use the longest match (`asinh` over `sinh`),
   and don't fire on `cos` while the user may still be typing `cosh` — i.e. only words that
@@ -117,11 +117,11 @@ arcsin arccos arctan sinh cosh tanh exp ln log min max abs floor ceil round sign
 - **Undo/redo**: snapshot-based (`toLatex` + cursor path) history, coalescing consecutive typed
   characters; `undo()`, `redo()`.
 
-## View (`view.js`)
+## View (`view.ts`)
 
 - `createEditor(container, { onChange, onEnter })` returns `{ model, focus(), getLatex(),
 setLatex(src), insert(...), destroy() }`.
-- Renders the tree as nested spans styled to match `render.js` (same fonts, fraction bar,
+- Renders the tree as nested spans styled to match `render.ts` (same fonts, fraction bar,
   radical, big operators, stretchy brackets via CSS scale or SVG). Empty blocks show a faint
   placeholder box. A blinking caret element sits at the cursor; selection highlighted.
 - Keyboard input goes through a visually hidden `<textarea>` that holds focus (so mobile
@@ -131,7 +131,7 @@ setLatex(src), insert(...), destroy() }`.
 - Click places the cursor at the nearest item boundary (use element rects); drag selects.
 - Accessible: `role="textbox"`, `aria-label`, `aria-live` summary of the LaTeX for screen readers.
 
-## Palette (`palette.js`)
+## Palette (`palette.ts`)
 
 A compact, grouped toolbar above the editor: **Structure** (fraction, xⁿ, x², xₙ, √, ⁿ√, |x|,
 ( ), Σ, Π, piecewise `{ □ : □ , □ }`), **Functions** (sin cos tan ln log exp, plus a "more"
