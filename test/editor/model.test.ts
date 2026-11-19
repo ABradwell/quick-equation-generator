@@ -138,6 +138,11 @@ const KEYSTROKES: [keys: string, expected: string, complete?: boolean][] = [
   ['x^2→^3', 'x^{23}'],
   ['x^2←←^1', 'x^{12}'],
   ['x_1→_2', 'x_{12}'],
+  // words in a name's subscript are labels, not functions or constants
+  ['v_max→+1', 'v_{max}+1'],
+  ['a_spin→(r)', 'a_{spin}\\left(r\\right)'],
+  ['x_exp→', 'x_{exp}'],
+  ['log_pi→(x)', '\\log_{\\pi}\\left(x\\right)'],
   ['sin^2→x+cos^2→x', '\\sin^2x+\\cos^2x'],
   ['log_2→(x)', '\\log_2\\left(x\\right)'],
   ['x^(n+1)', 'x^{\\left(n+1\\right)}'],

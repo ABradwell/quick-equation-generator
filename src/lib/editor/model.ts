@@ -450,7 +450,19 @@ export class MathModel {
     return text;
   }
 
+  // Subscripts on names are labels (v_max, a_spin): words typed there stay letters.
+  // A function's subscript (log_2) is a value, so it is not one.
+  _inSubscript(): boolean {
+    for (let node = this.cursor.block.parent; node; node = node.parent?.parent ?? null) {
+      if (node.kind !== 'sub' || !node.parent) continue;
+      const before = node.parent.items[node.parent.items.indexOf(node) - 1];
+      if (!(before?.kind === 'atom' && before.cls === 'fn')) return true;
+    }
+    return false;
+  }
+
   _longestWordSuffix(run: string): string | null {
+    if (this._inSubscript()) return null;
     for (let len = Math.min(run.length, MAX_WORD); len >= 2; len--) {
       if (AUTO_WORDS.has(run.slice(-len))) return run.slice(-len);
     }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseEquation, ParseError } from '../src/lib/parser.ts';
+import { parseEquation, parseValue, ParseError } from '../src/lib/parser.ts';
 import { evaluate } from '../src/lib/evaluate.ts';
 
 const value = (src: string, env: Record<string, number> = {}) =>
@@ -65,6 +65,21 @@ test('abs bars and piecewise', () => {
 
 test('sum scoping excludes the index from params', () => {
   assert.deepEqual(parseEquation('\\sum_{n=1}^{N} x^n').params, ['x', 'N']);
+});
+
+test('parseValue reads scientific notation in number boxes', () => {
+  const val = (src: string) => evaluate(parseValue(src), {});
+  assert.equal(val('5.972e24'), 5.972e24);
+  assert.equal(val('6.674E-11'), 6.674e-11);
+  assert.equal(val('-2.5e+3'), -2500);
+  assert.equal(val('.5e1'), 5);
+  assert.equal(val('1e3/2'), 500);
+  assert.equal(val('2*10^3'), 2000);
+  assert.ok(Math.abs(val('2e') - 2 * Math.E) < 1e-12, 'a bare e is still Euler’s number');
+  assert.ok(Math.abs(val('e^2') - Math.E ** 2) < 1e-12);
+  assert.ok(Math.abs(val('pi/4') - Math.PI / 4) < 1e-12);
+  // in equations e stays Euler's number
+  assert.ok(Math.abs(value('2e3') - 6 * Math.E) < 1e-12);
 });
 
 test('errors carry a position', () => {

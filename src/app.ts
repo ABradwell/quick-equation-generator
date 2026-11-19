@@ -1,4 +1,4 @@
-import { parseEquation, parseExpression, ParseError } from './lib/parser.ts';
+import { parseEquation, parseValue, ParseError } from './lib/parser.ts';
 import { evaluate } from './lib/evaluate.ts';
 import { LANGUAGES } from './lib/generators/index.ts';
 import { renderDefinition, renderIdentifier, escapeHtml as esc } from './lib/render.ts';
@@ -524,7 +524,7 @@ function makeEval(): Viz {
       values.set(name, input.value);
       let bad = false;
       try {
-        env[name] = input.value.trim() ? evaluate(parseExpression(input.value), {}) : NaN;
+        env[name] = input.value.trim() ? evaluate(parseValue(input.value), {}) : NaN;
         bad = Number.isNaN(env[name]);
       } catch {
         bad = true;

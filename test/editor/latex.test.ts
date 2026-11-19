@@ -329,6 +329,35 @@ test('fromLatex: failures report ok:false with a message', () => {
   assert.equal(fromLatex(null).ok, false);
 });
 
+test('fromLatex: words in subscripts stay labels', () => {
+  const cases: [string, string, string, string[]][] = [
+    // source, LaTeX the editor writes back, parsed name, parsed params
+    ['h_{max}(v, g) = v^2/g', 'h_{max}\\left(v,g\\right)=v^2/g', 'h_max', ['v', 'g']],
+    ['a_{spin}(r, N) = r N', 'a_{spin}\\left(r,N\\right)=rN', 'a_spin', ['r', 'N']],
+    ['\\lambda_{max}(T) = 1/T', '\\lambda_{max}\\left(T\\right)=1/T', 'lambda_max', ['T']],
+    // what earlier versions of the editor wrote
+    ['h_{\\max}\\left(v,g\\right)=v^2/g', 'h_{max}\\left(v,g\\right)=v^2/g', 'h_max', ['v', 'g']],
+    ['a_{s\\pi n}(r,N)=rN', 'a_{spin}\\left(r,N\\right)=rN', 'a_spin', ['r', 'N']],
+  ];
+  for (const [src, latex, name, params] of cases) {
+    const r = fromLatex(src);
+    assert.ok(r.ok, src);
+    assert.equal(toLatex(r.root), latex, src);
+    const def = parseEquation(latex);
+    assert.equal(def.name, name, src);
+    assert.deepEqual(def.params, params, src);
+  }
+  // Greek commands, sum limits and log bases keep their meaning.
+  const keep = (src: string) => {
+    const r = fromLatex(src);
+    assert.ok(r.ok, src);
+    return toLatex(r.root);
+  };
+  assert.equal(keep('x_{\\alpha}'), 'x_{\\alpha}');
+  assert.equal(keep('\\sum_{n=\\min(a,b)}^{N} n'), '\\sum_{n=\\min\\left(a,b\\right)}^{N}n');
+  assert.equal(keep('\\log_{\\pi}(x)'), '\\log_{\\pi}\\left(x\\right)');
+});
+
 test('fromLatex: multi-letter parameter names are not split into words', () => {
   // "tangent" is one variable for the parser here, so it must stay letters in the tree
   const src = 'f(tangent) = tangent^2';
