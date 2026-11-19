@@ -159,3 +159,7 @@ vite.config.ts.timestamp-*
 # Equation converter
 test/.tmp/
 .DS_Store
+
+# Compiled from src/ by `pnpm build`
+public/app.js
+public/lib/

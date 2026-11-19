@@ -1,21 +1,26 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "",
-  "buildCommand": "",
+  "buildCommand": "npm run build",
   "outputDirectory": "public",
   "routes": [
     {
       "src": "/(?:.*/)?\\.(?:env|git|aws|ssh|svn|htaccess|DS_Store)(?:/.*|\\..*)?",
-      "mitigate": { "action": "deny" }
+      "mitigate": {
+        "action": "deny"
+      }
     },
     {
       "src": "/(?:wp-admin|wp-login\\.php|wp-content|wp-includes|xmlrpc\\.php|phpmyadmin|cgi-bin)(?:/.*)?",
-      "mitigate": { "action": "deny" }
+      "mitigate": {
+        "action": "deny"
+      }
     },
     {
       "src": "/(?:.*/)?[^/]+\\.(?:php|asp|aspx|jsp|cgi)",
-      "mitigate": { "action": "deny" }
+      "mitigate": {
+        "action": "deny"
+      }
     }
   ]
 }

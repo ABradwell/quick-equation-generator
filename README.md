@@ -11,16 +11,20 @@ g(t) = e^{-t^2/2}/\sqrt{2\pi} →   func g(t float64) float64 { ... }
 
 ## Getting started
 
+Requires Node 22.18 or newer, which runs the TypeScript server and tests directly.
+
 ```sh
-pnpm install   # dev tools only (ESLint, Prettier) – the app has no runtime dependencies
-pnpm start     # http://localhost:5173  (PORT=8080 pnpm start to change)
+pnpm install   # dev tools only (TypeScript, ESLint, Prettier) – the app has no runtime dependencies
+pnpm start     # builds, then serves http://localhost:5173  (PORT=8080 pnpm start to change)
 ```
 
 | Script                              | What it does                                            |
 | ----------------------------------- | ------------------------------------------------------- |
-| `pnpm start`                        | Start the static server                                 |
-| `pnpm dev`                          | Start with `node --watch`                               |
+| `pnpm build`                        | Compile `src/` to JavaScript in `public/`               |
+| `pnpm start`                        | Build, then start the static server                     |
+| `pnpm dev`                          | Rebuild on change and restart the server on change      |
 | `pnpm test`                         | Parser tests + compile-and-run tests for every language |
+| `pnpm typecheck`                    | `tsc` over source, tests and server                     |
 | `pnpm lint`                         | ESLint                                                  |
 | `pnpm format` / `pnpm format:check` | Prettier                                                |
 
@@ -79,8 +83,8 @@ typeset. While slots are still empty you see "Keep typing..." instead of an erro
 
 ## Deployment (Vercel)
 
-The app is static files only (`public/`), so Vercel serves it with no install or build step.
-`vercel.json` sets this up and blocks common bot-probe paths (`.env`, `wp-admin`, `*.php`…).
+The app is static files only. Vercel installs the dev dependencies, runs `npm run build` to
+compile `src/` into `public/`, and serves `public/`. `vercel.json` sets this up and blocks common bot-probe paths (`.env`, `wp-admin`, `*.php`…).
 
 1. Import the repository at [vercel.com/new](https://vercel.com/new). Leave the framework
    preset as **Other**; the settings in `vercel.json` take over.
@@ -89,23 +93,25 @@ The app is static files only (`public/`), so Vercel serves it with no install or
    `equations.aidenbradwell.com`). If the domain's DNS is managed by Vercel this is
    automatic; otherwise add a `CNAME` record pointing to `cname.vercel-dns.com`.
 
-`server.js` is only for local development and is not deployed.
+`server.ts` is only for local development and is not deployed.
 
 ## Project layout
 
 ```
-server.js                    tiny static server (node:http only)
-public/
-  index.html, style.css, app.js
-  lib/parser.js              math notation → AST
-  lib/evaluate.js            reference evaluator (graph + tests)
-  lib/render.js              AST → typeset HTML preview
+server.ts                    tiny static server (node:http only)
+public/                      index.html, style.css; build output (app.js, lib/) is git-ignored
+src/
+  app.ts                     page wiring
+  lib/ast.ts                 AST types
+  lib/parser.ts              math notation → AST
+  lib/evaluate.ts            reference evaluator (graph + tests)
+  lib/render.ts              AST → typeset HTML preview
   lib/editor/                visual editor: model, latex, tree, view, palette, util
-  lib/generators/*.js        AST → Python / TypeScript / Go / Rust / Java
+  lib/generators/*.ts        AST → Python / TypeScript / Go / Rust / Java
 docs/AST.md                  AST format shared by all of the above
 docs/EDITOR.md               visual editor design
-test/                        node:test suites
+test/                        node:test suites (run directly by Node's type stripping)
 ```
 
 Adding a language means writing one `generate(def)` function (see `docs/AST.md`) and
-registering it in `public/lib/generators/index.js`.
+registering it in `src/lib/generators/index.ts`.

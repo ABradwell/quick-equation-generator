@@ -1,6 +1,6 @@
 # AST reference
 
-`parseEquation(src)` in `public/lib/parser.js` returns a function definition:
+`parseEquation(src)` in `src/lib/parser.ts` returns a `Definition` (types in `src/lib/ast.ts`):
 
 ```js
 {
@@ -59,5 +59,5 @@ Generators must rename clashes by appending `_`.
 
 ### Reference semantics
 
-`public/lib/evaluate.js` is the reference implementation. Generated code must give the
+`src/lib/evaluate.ts` is the reference implementation. Generated code must give the
 same results (within float tolerance).
