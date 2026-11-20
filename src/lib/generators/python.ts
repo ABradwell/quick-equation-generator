@@ -2,6 +2,7 @@
 // Results follow src/lib/evaluate.ts; Python raises where the reference gives inf/NaN.
 
 import type { BinNode, CallNode, Definition, LoopNode, Node, PiecewiseNode } from '../ast.ts';
+import { docLines, prepareDefinition, type GenMeta } from './shared.ts';
 
 // Precedence, loosest to tightest, following Python's grammar.
 const P = { COND: 0, AND: 1, CMP: 2, ADD: 3, MUL: 4, UNARY: 5, POW: 6, ATOM: 7 };
@@ -187,12 +188,30 @@ function piecewise({ cases, otherwise }: PiecewiseNode): string {
   return `(${out})`;
 }
 
-export function generate(def: Definition): string {
+/** Raw docstring: `"""` cannot appear, and a final backslash would escape the closing quotes. */
+function docstring(lines: string[]): string {
+  let body = lines.join('\n').replace(/"""/g, '"" "');
+  if (body.endsWith('\\')) body += ' ';
+  const indented = body.replace(/\n(?=.)/g, '\n    ');
+  // Blank lines carry no trailing spaces; single lines stay on one row.
+  return lines.length === 1
+    ? `    r"""${body}"""`
+    : `    r"""${indented.replace(/\n    (?=\n)/g, '\n')}\n    """`;
+}
+
+export function generate(input: Definition, meta?: GenMeta): string {
+  const { def, constants } = prepareDefinition(input, meta, (n) => ident(n) !== n);
   const params = def.params.map((p) => `${ident(p)}: float`).join(', ');
   const code = text(def.body);
+  const consts = constants.map((c) => `${c.name} = ${c.value}  # ${c.about}`);
   const source = [
+    ...(consts.length ? [...consts, '', ''] : []),
     `def ${ident(def.name)}(${params}) -> float:`,
-    `    """Evaluate ${def.name}(${def.params.join(', ')})."""`,
+    docstring(
+      docLines(def, meta, ident(def.name), def.params.map(ident), 'google') ?? [
+        `Evaluate ${def.name}(${def.params.join(', ')}).`,
+      ],
+    ),
     `    return ${code}`,
     '',
   ].join('\n');

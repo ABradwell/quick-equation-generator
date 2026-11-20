@@ -4,11 +4,16 @@ import {
   PREC,
   collectNames,
   docComment,
+  docLines,
+  blockComment,
+  type GenMeta,
   floatLiteral,
   hasNestedLoop,
+  walk,
   isNegativeNumber,
   literalBound,
   makeFresh,
+  prepareDefinition,
   safeName,
   wrap,
 } from './shared.ts';
@@ -32,10 +37,20 @@ const UNARY: Record<string, string> = {
 
 const ind = (n: number): string => '    '.repeat(n);
 
+/** True if emitting `node` creates a lambda: a piecewise with a loop inside it (see emitArm). */
+function buildsLambda(node: Node): boolean {
+  let found = false;
+  walk(node, (n) => {
+    if (n.type === 'piecewise' && hasNestedLoop(n)) found = true;
+  });
+  return found;
+}
+
 /** AST names mapped to the Java names currently in scope. */
 type Scope = Map<string, string>;
 
-export function generate(def: Definition): string {
+export function generate(input: Definition, meta?: GenMeta): string {
+  const { def, constants } = prepareDefinition(input, meta, (n) => safeName(n, RESERVED) !== n);
   const taken = collectNames(def);
   const fresh = makeFresh(taken);
   const renamedIndices = new Set<string>();
@@ -125,47 +140,88 @@ export function generate(def: Definition): string {
     }
   }
 
+  // Statements emitted ahead of the expression being built, at the indent passed as `lvl`.
+  // Loops become statements here; the accumulator stands in for the loop in the expression.
+  let stmts: string[] = [];
+
+  /** Run `fn` with an empty statement list; returns its result and the statements it emitted. */
+  function inBlock<T>(fn: () => T): [T, string[]] {
+    const outer = stmts;
+    stmts = [];
+    try {
+      return [fn(), stmts];
+    } finally {
+      stmts = outer;
+    }
+  }
+
   function emitLoop(node: LoopNode, lvl: number, env: Scope): Emitted {
     const isSum = node.type === 'sum';
-    const acc = fresh(isSum ? 'sum' : 'prod');
-    const hi = fresh('hi');
-    // The index must not redeclare anything in scope (lambdas cannot shadow locals).
+    // Java locals cannot shadow one another, so the index must not reuse a name in scope.
     const inScope = new Set(env.values());
     let k = safeName(node.index, RESERVED);
     while (inScope.has(k) || renamedIndices.has(k)) k += '_';
     if (k !== node.index) renamedIndices.add(k);
     const inner = new Map(env).set(node.index, k);
 
-    // A nested lambda can only capture effectively-final variables, so a loop
-    // counter that is used inside one is copied into a per-iteration local.
-    const copy = hasNestedLoop(node);
-    const counter = copy ? fresh('i') : k;
+    // Bounds are emitted first: a loop inside a bound runs before this one.
     const bound = (b: Node): string =>
-      literalBound(b) ?? `Math.floor(${wrap(emit(b, lvl + 1, env), PREC.ADD)} + 0.5)`;
-    const body = emit(node.body, lvl + 2, inner).s;
+      literalBound(b) ?? `Math.floor(${wrap(emit(b, lvl, env), PREC.ADD)} + 0.5)`;
+    const from = bound(node.from);
+    const to = bound(node.to);
+    const acc = fresh(isSum ? 'sum' : 'prod');
+    const lines = stmts;
+    lines.push(`${ind(lvl)}double ${acc} = ${isSum ? '0.0' : '1.0'};`);
+    let hi = to;
+    if (literalBound(node.to) === null) {
+      hi = fresh('hi');
+      lines.push(`${ind(lvl)}double ${hi} = ${to};`);
+    }
+    // A lambda can only capture effectively-final variables, so when the body builds one
+    // (see emitArm) the loop counter is copied into a per-iteration local.
+    const copy = buildsLambda(node.body);
+    const counter = copy ? fresh('i') : k;
+    const [body, bodyStmts] = inBlock(() => emit(node.body, lvl + 1, inner).s);
+    lines.push(
+      `${ind(lvl)}for (double ${counter} = ${from}; ${counter} <= ${hi}; ${counter}++) {`,
+      ...(copy ? [`${ind(lvl + 1)}double ${k} = ${counter};`] : []),
+      ...bodyStmts,
+      `${ind(lvl + 1)}${acc} ${isSum ? '+=' : '*='} ${body};`,
+      `${ind(lvl)}}`,
+    );
+    return { s: acc, p: PREC.ATOM };
+  }
+
+  /**
+   * One condition or value of a piecewise, starting on a line indented `lvl`. A loop inside it
+   * must only run when the branch is reached, so its statements go in a lambda that is called
+   * in place, instead of ahead of the whole expression.
+   */
+  function emitArm(node: Node, lvl: number, env: Scope, type: 'Double' | 'Boolean'): Emitted {
+    const [code, armStmts] = inBlock(() => emit(node, lvl + 1, env));
+    if (!armStmts.length) return code;
     const s = [
-      '((java.util.function.DoubleSupplier) () -> {',
-      `${ind(lvl + 1)}double ${acc} = ${isSum ? '0.0' : '1.0'};`,
-      `${ind(lvl + 1)}double ${hi} = ${bound(node.to)};`,
-      `${ind(lvl + 1)}for (double ${counter} = ${bound(node.from)}; ${counter} <= ${hi}; ${counter}++) {`,
-      ...(copy ? [`${ind(lvl + 2)}double ${k} = ${counter};`] : []),
-      `${ind(lvl + 2)}${acc} ${isSum ? '+=' : '*='} ${body};`,
-      `${ind(lvl + 1)}}`,
-      `${ind(lvl + 1)}return ${acc};`,
-      `${ind(lvl)}}).getAsDouble()`,
+      `((java.util.function.${type}Supplier) () -> {`,
+      ...armStmts,
+      `${ind(lvl + 1)}return ${code.s};`,
+      `${ind(lvl)}}).getAs${type}()`,
     ].join('\n');
     return { s, p: PREC.ATOM };
   }
 
   function emitPiecewise(node: PiecewiseNode, lvl: number, env: Scope): Emitted {
+    // With several cases, every case after the first and the fallback start on a new line.
+    const several = node.cases.length > 1;
+    const arms = node.cases.map((c, i) => {
+      const at = several && i ? lvl + 2 : lvl;
+      const cond = emitArm(c.cond, at, env, 'Boolean').s;
+      return `${cond} ? ${wrap(emitArm(c.value, at, env, 'Double'), PREC.AND)}`;
+    });
     const other = node.otherwise
-      ? emit(node.otherwise, lvl + 1, env)
+      ? emitArm(node.otherwise, several ? lvl + 2 : lvl, env, 'Double')
       : { s: 'Double.NaN', p: PREC.ATOM };
-    const arms = node.cases.map(
-      (c) => `${emit(c.cond, lvl, env).s} ? ${wrap(emit(c.value, lvl + 1, env), PREC.AND)}`,
-    );
     const tail = wrap(other, PREC.TERNARY);
-    if (arms.length === 1) return { s: `${arms[0]} : ${tail}`, p: PREC.TERNARY };
+    if (!several) return { s: `${arms[0]} : ${tail}`, p: PREC.TERNARY };
     const s = [
       ...arms.map((a, i) => (i ? `${ind(lvl + 2)}: ${a}` : a)),
       `${ind(lvl + 2)}: ${tail}`,
@@ -174,11 +230,18 @@ export function generate(def: Definition): string {
   }
 
   const env: Scope = new Map(def.params.map((p, i) => [p, params[i]]));
-  const body = emit(def.body, 1, env).s;
+  const [body, bodyStmts] = inBlock(() => emit(def.body, 1, env).s);
   return [
-    '// Paste this method into a class.\n',
-    `/** ${docComment(fname, params)} */\n`,
+    constants.length
+      ? '// Paste these declarations into a class.\n'
+      : '// Paste this method into a class.\n',
+    ...constants.map(
+      (c) => `static final double ${c.name} = ${floatLiteral(c.value)}; // ${c.about}\n`,
+    ),
+    constants.length ? '\n' : '',
+    `${blockComment(docLines(def, meta, fname, params, 'jsdoc') ?? [docComment(fname, params)])}\n`,
     `public static double ${fname}(${params.map((p) => `double ${p}`).join(', ')}) {\n`,
+    ...bodyStmts.map((l) => `${l}\n`),
     `${ind(1)}return ${body};\n`,
     '}',
   ].join('');

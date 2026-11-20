@@ -1,6 +1,7 @@
 // Reference evaluator for the AST (docs/AST.md). Used for the graph and as the
 // source of truth when testing generated code in other languages.
 import type { ConstantName, Env, Node } from './ast.ts';
+import { scientific } from './scientific.ts';
 
 const CONSTANTS: Record<ConstantName, number> = { pi: Math.PI, tau: 2 * Math.PI, e: Math.E };
 
@@ -51,6 +52,9 @@ function evalNode(node: Node, env: Env): number | boolean {
     case 'neg':
       return -evaluate(node.arg, env);
     case 'bin': {
+      // `6.674 * 10^-11` is the literal 6.674e-11, as in the generated code.
+      const sci = scientific(node);
+      if (sci) return sci.rest ? evaluate(sci.rest, env) * sci.value : sci.value;
       const a = evaluate(node.left, env);
       const b = evaluate(node.right, env);
       switch (node.op) {

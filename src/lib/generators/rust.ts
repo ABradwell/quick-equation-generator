@@ -4,10 +4,14 @@ import {
   PREC,
   collectNames,
   docComment,
+  docLines,
+  lineComment,
+  type GenMeta,
   floatLiteral,
   isNegativeNumber,
   literalBound,
   makeFresh,
+  prepareDefinition,
   safeName,
   usedVars,
   walk,
@@ -64,7 +68,8 @@ function typed(node: Node): boolean {
   }
 }
 
-export function generate(def: Definition): string {
+export function generate(input: Definition, meta?: GenMeta): string {
+  const { def, constants } = prepareDefinition(input, meta, (n) => name(n) !== n);
   const fresh = makeFresh(collectNames(def));
 
   // Every emit* returns { s: source, p: precedence }; `lvl` is the indent of the line it starts on.
@@ -205,7 +210,12 @@ export function generate(def: Definition): string {
   const bodySrc =
     top.type === 'sum' || top.type === 'prod' ? loopStmts(top, 1) : `${ind(1)}${emit(top, 1).s}`;
   return [
-    `/// ${docComment(fname, params)}\n`,
+    ...constants.map(
+      (c) =>
+        `#[allow(non_upper_case_globals)]\nconst ${c.name}: f64 = ${floatLiteral(c.value)}; // ${c.about}\n`,
+    ),
+    constants.length ? '\n' : '',
+    `${lineComment('///', docLines(def, meta, fname, params, 'plain') ?? [docComment(fname, params)])}\n`,
     allows.length ? `#[allow(${allows.join(', ')})]\n` : '',
     `fn ${fname}(${params.map((p) => `${p}: f64`).join(', ')}) -> f64 {\n`,
     `${bodySrc}\n`,

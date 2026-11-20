@@ -4,6 +4,7 @@ import { parseEquation, parseExpression } from '../src/lib/parser.ts';
 import { evaluate } from '../src/lib/evaluate.ts';
 import { fromLatex, toLatex } from '../src/lib/editor/latex.ts';
 import { LANGUAGES } from '../src/lib/generators/index.ts';
+import { foldScientific, walk } from '../src/lib/generators/shared.ts';
 import { NOTEBOOK, NOTEBOOK_ENTRIES } from '../src/lib/notebook/data.ts';
 import {
   addSaved,
@@ -105,4 +106,28 @@ test('saved equations: parse, dedupe and add', () => {
   assert.deepEqual(parseSaved(JSON.stringify(list))[0].values, { x: '3' });
   const odd = JSON.stringify([{ id: 'q', title: 'Q', src: 'q(x) = x', values: { x: 1, y: '2' } }]);
   assert.deepEqual(parseSaved(odd)[0].values, { y: '2' });
+});
+
+test('declared constants appear as literals in the formula and get named in generated code', () => {
+  let declared = 0;
+  for (const entry of NOTEBOOK_ENTRIES) {
+    if (!entry.constants) continue;
+    const def = parseEquation(entry.src);
+    const literals: number[] = [];
+    walk(foldScientific(def.body), (n) => {
+      if (n.type === 'num') literals.push(n.value);
+    });
+    for (const [name, c] of Object.entries(entry.constants)) {
+      declared++;
+      assert.ok(c.about.trim().length > 0, `${entry.id}: ${name} says what it is`);
+      assert.ok(
+        literals.some((v) => Math.abs(v - c.value) <= 1e-9 * Math.abs(c.value)),
+        `${entry.id}: ${name} = ${c.value} is not a literal in ${entry.src}`,
+      );
+      assert.ok(!def.params.includes(name), `${entry.id}: ${name} clashes with a parameter`);
+      const code = LANGUAGES.python.generate(def, { constants: entry.constants });
+      assert.ok(code.includes(`${name} = `), `${entry.id}: python names ${name}`);
+    }
+  }
+  assert.ok(declared >= 30, `only ${declared} constants declared`);
 });
