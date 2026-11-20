@@ -10,6 +10,8 @@
 // - Physical constants are written as numbers so functions only take the inputs that vary:
 //   G = 6.674·10⁻¹¹, c = 299792458, g₀ = 9.80665, σ = 5.670374·10⁻⁸, R = 8.314,
 //   k_B = 1.380649·10⁻²³, h = 6.62607015·10⁻³⁴.
+//   Also inlined: Wien b = 2.897771955·10⁻³, Sutton-Graves k_SG = 1.7415·10⁻⁴.
+//   Each entry that uses one lists it in `constants`, so generated code can name it.
 // - Eccentricity is `ecc`, because `e` always means Euler's number.
 // - Mass flow rate is `mdot` (the parser has no \dot accent).
 
@@ -31,6 +33,11 @@ export interface NotebookEntry {
   tol?: number;
   /** What the example describes, shown next to it. */
   exampleNote?: string;
+  /**
+   * Physical constants written as numbers in `src`. Generated code gives each one a name and a
+   * comment. Every value must appear as a literal in the parsed body (see test/notebook.test.ts).
+   */
+  constants?: Record<string, { value: number; about: string }>;
 }
 
 export interface NotebookTopic {
@@ -40,6 +47,19 @@ export interface NotebookTopic {
 }
 
 const r = String.raw;
+
+/** Constants that entries inline as numbers. Names match the header above. */
+const CONSTANTS = {
+  G: { value: 6.674e-11, about: 'gravitational constant, m³/(kg·s²)' },
+  c: { value: 299792458, about: 'speed of light in vacuum, m/s' },
+  g_0: { value: 9.80665, about: 'standard gravity, m/s²' },
+  sigma: { value: 5.670374e-8, about: 'Stefan-Boltzmann constant, W/(m²·K⁴)' },
+  R: { value: 8.314, about: 'molar gas constant, J/(mol·K)' },
+  k_B: { value: 1.380649e-23, about: 'Boltzmann constant, J/K' },
+  h: { value: 6.62607015e-34, about: 'Planck constant, J·s' },
+  b: { value: 2.897771955e-3, about: 'Wien displacement constant, m·K' },
+  k_SG: { value: 1.7415e-4, about: 'Sutton-Graves constant for Earth air, kg^0.5/m' },
+};
 
 const PI = Math.PI;
 const C = 299792458;
@@ -289,6 +309,7 @@ export const NOTEBOOK: NotebookTopic[] = [
           m_2: 'second mass (kg)',
           r: 'distance between centres (m)',
         },
+        constants: { G: CONSTANTS.G },
         example: { m_1: EARTH.M, m_2: 7.348e22, r: 3.844e8 },
         expect: 1.98e20,
         tol: 5e-3,
@@ -300,6 +321,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`g(M, r) = 6.674 \cdot 10^{-11} \frac{M}{r^2}`,
         about: 'Gravitational acceleration at a distance from a body’s centre.',
         vars: { M: 'body mass (kg)', r: 'distance from centre (m)' },
+        constants: { G: CONSTANTS.G },
         example: { M: EARTH.M, r: EARTH.R },
         expect: 9.82,
         exampleNote: 'Earth’s surface',
@@ -310,6 +332,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`\mu(M) = 6.674 \cdot 10^{-11} M`,
         about: 'μ = GM, the input most orbital equations take.',
         vars: { M: 'body mass (kg)' },
+        constants: { G: CONSTANTS.G },
         example: { M: EARTH.M },
         expect: 3.986e14,
         exampleNote: 'Earth',
@@ -320,6 +343,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`U(M, m, r) = -6.674 \cdot 10^{-11} \frac{M m}{r}`,
         about: 'Potential energy of two masses, zero at infinite separation.',
         vars: { M: 'central mass (kg)', m: 'orbiting mass (kg)', r: 'distance (m)' },
+        constants: { G: CONSTANTS.G },
         example: { M: EARTH.M, m: 1, r: EARTH.R },
         expect: -6.256e7,
         exampleNote: '1 kg on Earth’s surface',
@@ -330,6 +354,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`v_{esc}(M, r) = \sqrt{\frac{2 \cdot 6.674 \cdot 10^{-11} M}{r}}`,
         about: 'Minimum speed to escape a body without further thrust.',
         vars: { M: 'body mass (kg)', r: 'distance from centre (m)' },
+        constants: { G: CONSTANTS.G },
         example: { M: EARTH.M, r: EARTH.R },
         expect: 11186,
         exampleNote: 'Earth’s surface',
@@ -379,6 +404,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`a_t(M, r, d) = \frac{2 \cdot 6.674 \cdot 10^{-11} M d}{r^3}`,
         about: 'Difference in pull across a body of size d at distance r.',
         vars: { M: 'perturbing mass (kg)', r: 'distance (m)', d: 'radius of affected body (m)' },
+        constants: { G: CONSTANTS.G },
         example: { M: 7.348e22, r: 3.844e8, d: EARTH.R },
         expect: 1.1e-6,
         tol: 1e-2,
@@ -612,6 +638,7 @@ export const NOTEBOOK: NotebookTopic[] = [
           m_0: 'initial mass (kg)',
           m_f: 'final mass (kg)',
         },
+        constants: { g_0: CONSTANTS.g_0 },
         example: { I_sp: 300, m_0: 1000, m_f: 500 },
         expect: 2039.2,
       },
@@ -621,6 +648,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`v_e(I_{sp}) = 9.80665 I_{sp}`,
         about: 'Exhaust speed from specific impulse.',
         vars: { I_sp: 'specific impulse (s)' },
+        constants: { g_0: CONSTANTS.g_0 },
         example: { I_sp: 311 },
         expect: 3049.9,
       },
@@ -645,6 +673,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`I_{sp}(F, mdot) = \frac{F}{9.80665 \, mdot}`,
         about: 'Thrust per unit weight flow of propellant.',
         vars: { F: 'thrust (N)', mdot: 'mass flow rate (kg/s)' },
+        constants: { g_0: CONSTANTS.g_0 },
         example: { F: 845000, mdot: 287 },
         expect: 300.23,
       },
@@ -727,6 +756,7 @@ export const NOTEBOOK: NotebookTopic[] = [
           p_e: 'exit pressure (Pa)',
           p_c: 'chamber pressure (Pa)',
         },
+        constants: { R: CONSTANTS.R },
         example: { gamma: 1.2, T_c: 3500, M: 0.022, p_e: 1e5, p_c: 1e7 },
         expect: 2916,
       },
@@ -740,6 +770,7 @@ export const NOTEBOOK: NotebookTopic[] = [
           m_0: 'initial mass (kg)',
           m_f: 'final mass (kg)',
         },
+        constants: { c: CONSTANTS.c },
         example: { v_e: C, m_0: Math.E, m_f: 1 },
         expect: C * Math.tanh(1),
         exampleNote: 'photon drive, mass ratio e',
@@ -774,6 +805,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`H(T, M, g) = \frac{8.314 T}{M g}`,
         about: 'Height over which pressure falls by a factor of e.',
         vars: { T: 'temperature (K)', M: 'molar mass (kg/mol)', g: 'gravity (m/s²)' },
+        constants: { R: CONSTANTS.R },
         example: { T: 288, M: 0.02896, g: 9.81 },
         expect: 8428,
         exampleNote: 'Earth near sea level',
@@ -872,6 +904,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`q_s(\rho, r_n, v) = 1.7415 \cdot 10^{-4} \sqrt{\frac{\rho}{r_n}} v^3`,
         about: 'Convective heating at the nose during Earth entry.',
         vars: { rho: 'air density (kg/m³)', r_n: 'nose radius (m)', v: 'speed (m/s)' },
+        constants: { k_SG: CONSTANTS.k_SG },
         example: { rho: 1e-4, r_n: 1, v: 7500 },
         expect: 7.347e5,
       },
@@ -976,6 +1009,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`\gamma(v) = \frac{1}{\sqrt{1 - \frac{v^2}{299792458^2}}}`,
         about: 'How strongly time and length change at speed v.',
         vars: { v: 'speed (m/s)' },
+        constants: { c: CONSTANTS.c },
         example: { v: 0.8 * C },
         expect: 5 / 3,
         exampleNote: '0.8 c',
@@ -986,6 +1020,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`t(t_0, v) = \frac{t_0}{\sqrt{1 - \frac{v^2}{299792458^2}}}`,
         about: 'Time measured by a stationary observer for a moving clock.',
         vars: { t_0: 'proper time (s)', v: 'speed (m/s)' },
+        constants: { c: CONSTANTS.c },
         example: { t_0: 1, v: 0.6 * C },
         expect: 1.25,
       },
@@ -995,6 +1030,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`L(L_0, v) = L_0 \sqrt{1 - \frac{v^2}{299792458^2}}`,
         about: 'Length of a moving object along its motion.',
         vars: { L_0: 'proper length (m)', v: 'speed (m/s)' },
+        constants: { c: CONSTANTS.c },
         example: { L_0: 1, v: 0.6 * C },
         expect: 0.8,
       },
@@ -1004,6 +1040,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`u_{tot}(u, v) = \frac{u + v}{1 + \frac{u v}{299792458^2}}`,
         about: 'Combined speed of two motions. Never exceeds c.',
         vars: { u: 'speed in moving frame (m/s)', v: 'frame speed (m/s)' },
+        constants: { c: CONSTANTS.c },
         example: { u: 0.5 * C, v: 0.5 * C },
         expect: 0.8 * C,
       },
@@ -1013,6 +1050,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`E(m) = m \cdot 299792458^2`,
         about: 'Rest energy of a mass.',
         vars: { m: 'mass (kg)' },
+        constants: { c: CONSTANTS.c },
         example: { m: 1 },
         expect: 8.98755e16,
       },
@@ -1022,6 +1060,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`K(m, v) = \left(\frac{1}{\sqrt{1 - \frac{v^2}{299792458^2}}} - 1\right) m \cdot 299792458^2`,
         about: 'Kinetic energy valid at any speed.',
         vars: { m: 'mass (kg)', v: 'speed (m/s)' },
+        constants: { c: CONSTANTS.c },
         example: { m: 1, v: 0.6 * C },
         expect: 0.25 * C * C,
       },
@@ -1031,6 +1070,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`p(m, v) = \frac{m v}{\sqrt{1 - \frac{v^2}{299792458^2}}}`,
         about: 'Momentum valid at any speed.',
         vars: { m: 'mass (kg)', v: 'speed (m/s)' },
+        constants: { c: CONSTANTS.c },
         example: { m: 1, v: 0.6 * C },
         expect: 0.75 * C,
       },
@@ -1040,6 +1080,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`r_s(M) = \frac{2 \cdot 6.674 \cdot 10^{-11} M}{299792458^2}`,
         about: 'Event horizon radius of a non-rotating black hole.',
         vars: { M: 'mass (kg)' },
+        constants: { G: CONSTANTS.G, c: CONSTANTS.c },
         example: { M: SUN.M },
         expect: 2954,
         exampleNote: 'the Sun',
@@ -1050,6 +1091,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`t_0(t_f, M, r) = t_f \sqrt{1 - \frac{2 \cdot 6.674 \cdot 10^{-11} M}{r \cdot 299792458^2}}`,
         about: 'Time passed near a mass while t_f passes far away.',
         vars: { t_f: 'far-away time (s)', M: 'mass (kg)', r: 'distance from centre (m)' },
+        constants: { G: CONSTANTS.G, c: CONSTANTS.c },
         example: { t_f: 1, M: SUN.M, r: 5908 },
         expect: Math.SQRT1_2,
         exampleNote: 'twice the Sun’s Schwarzschild radius',
@@ -1075,6 +1117,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`P(\epsilon, A, T) = 5.670374 \cdot 10^{-8} \epsilon A T^4`,
         about: 'Power radiated by a surface. σ is built in.',
         vars: { epsilon: 'emissivity', A: 'area (m²)', T: 'temperature (K)' },
+        constants: { sigma: CONSTANTS.sigma },
         example: { epsilon: 1, A: 6.09e18, T: 5772 },
         expect: SUN.L,
         tol: 5e-3,
@@ -1091,6 +1134,7 @@ export const NOTEBOOK: NotebookTopic[] = [
           T: 'radiator temperature (K)',
           T_0: 'surroundings temperature (K)',
         },
+        constants: { sigma: CONSTANTS.sigma },
         example: { epsilon: 0.9, A: 10, T: 300, T_0: 3 },
         expect: 4133.7,
         exampleNote: 'a spacecraft radiator facing deep space',
@@ -1101,6 +1145,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`T_{eq}(L, A, d) = \left(\frac{L(1 - A)}{16\pi \cdot 5.670374 \cdot 10^{-8} d^2}\right)^{1/4}`,
         about: 'Blackbody temperature of a planet heated by its star.',
         vars: { L: 'stellar luminosity (W)', A: 'Bond albedo', d: 'orbital distance (m)' },
+        constants: { sigma: CONSTANTS.sigma },
         example: { L: SUN.L, A: 0.3, d: AU },
         expect: 254.6,
         exampleNote: 'Earth',
@@ -1121,6 +1166,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`\lambda_{peak}(T) = \frac{2.897771955 \cdot 10^{-3}}{T}`,
         about: 'Wavelength where a blackbody glows brightest.',
         vars: { T: 'temperature (K)' },
+        constants: { b: CONSTANTS.b },
         example: { T: 5772 },
         expect: 5.0204e-7,
         exampleNote: 'the Sun, about 502 nm',
@@ -1131,6 +1177,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`p(n, T, V) = \frac{8.314 n T}{V}`,
         about: 'Pressure of an ideal gas. R is built in.',
         vars: { n: 'amount (mol)', T: 'temperature (K)', V: 'volume (m³)' },
+        constants: { R: CONSTANTS.R },
         example: { n: 1, T: 273.15, V: 0.022414 },
         expect: 101325,
       },
@@ -1140,6 +1187,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`v_{rms}(T, m) = \sqrt{\frac{3 \cdot 1.380649 \cdot 10^{-23} T}{m}}`,
         about: 'Typical speed of gas molecules. Relevant to atmospheric escape.',
         vars: { T: 'temperature (K)', m: 'molecule mass (kg)' },
+        constants: { k_B: CONSTANTS.k_B },
         example: { T: 300, m: 4.65e-26 },
         expect: 517,
         exampleNote: 'nitrogen at room temperature',
@@ -1188,6 +1236,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`t(d) = \frac{d}{299792458}`,
         about: 'One-way signal delay over a distance.',
         vars: { d: 'distance (m)' },
+        constants: { c: CONSTANTS.c },
         example: { d: AU },
         expect: 499.0,
         exampleNote: 'Sun to Earth',
@@ -1198,6 +1247,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`\lambda(f) = \frac{299792458}{f}`,
         about: 'Wavelength of an electromagnetic wave.',
         vars: { f: 'frequency (Hz)' },
+        constants: { c: CONSTANTS.c },
         example: { f: 8.4e9 },
         expect: 0.03569,
         exampleNote: 'X-band deep space downlink',
@@ -1208,6 +1258,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`\Delta_f(f, v) = \frac{f v}{299792458}`,
         about: 'Frequency shift for a radial speed well below c.',
         vars: { f: 'carrier frequency (Hz)', v: 'radial speed (m/s)' },
+        constants: { c: CONSTANTS.c },
         example: { f: 2.2e9, v: 7500 },
         expect: 55038,
       },
@@ -1217,6 +1268,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`L_{fs}(d, f) = 20\log\left(\frac{4\pi d f}{299792458}\right)`,
         about: 'Signal loss in dB between isotropic antennas.',
         vars: { d: 'distance (m)', f: 'frequency (Hz)' },
+        constants: { c: CONSTANTS.c },
         example: { d: 3.6e7, f: 12e9 },
         expect: 205.16,
         exampleNote: 'Ku-band from GEO',
@@ -1253,6 +1305,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`E(f) = 6.62607015 \cdot 10^{-34} f`,
         about: 'Energy of one photon. h is built in.',
         vars: { f: 'frequency (Hz)' },
+        constants: { h: CONSTANTS.h },
         example: { f: 5.45e14 },
         expect: 3.6112e-19,
       },
@@ -1262,6 +1315,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`F(S, A) = \frac{2 S A}{299792458}`,
         about: 'Thrust on a perfectly reflecting sail facing the Sun.',
         vars: { S: 'stellar flux (W/m²)', A: 'sail area (m²)' },
+        constants: { c: CONSTANTS.c },
         example: { S: 1361, A: 100 },
         expect: 9.0796e-4,
       },
@@ -1284,6 +1338,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`f(f_0, M, r) = f_0\left(1 - \frac{6.674 \cdot 10^{-11} M}{r \cdot 299792458^2}\right)`,
         about: 'Weak-field frequency shift of light climbing out of a well.',
         vars: { f_0: 'emitted frequency (Hz)', M: 'mass (kg)', r: 'emitter radius (m)' },
+        constants: { G: CONSTANTS.G, c: CONSTANTS.c },
         example: { f_0: 1e9, M: SUN.M, r: 6.957e8 },
         expect: 1e9 * (1 - 2.123e-6),
         tol: 1e-9,
@@ -1295,6 +1350,7 @@ export const NOTEBOOK: NotebookTopic[] = [
         src: r`\rho_c(H) = \frac{3H^2}{8\pi \cdot 6.674 \cdot 10^{-11}}`,
         about: 'Density for a flat universe at Hubble parameter H.',
         vars: { H: 'Hubble parameter (1/s)' },
+        constants: { G: CONSTANTS.G },
         example: { H: 2.2e-18 },
         expect: 8.657e-27,
         exampleNote: 'H₀ ≈ 68 km/s/Mpc',

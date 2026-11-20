@@ -22,6 +22,17 @@ const EXTRA: FixtureSource[] = [
   { src: 'big(x) = exp(x)', inputs: [[1000]] },
   { src: 'mm(x) = min(x, 2) + max(x, 2)', inputs: [[5]] },
   { src: 'sg(x) = sign(x)', inputs: [[-4], [0], [2.5]] },
+  // Loop shapes: a loop in a bound, sibling loops, an index shadowing a parameter in its own
+  // bound, and loops under a piecewise. At x = 0, pwl's first branch has an infinite upper
+  // bound (1 / 0), so the loop there must not run unless the branch is taken.
+  { src: 'lb(n) = \\sum_{k=0}^{\\sum_{j=1}^{n} j} k', inputs: [[3]] },
+  { src: 'sib(x) = \\prod_{k=1}^{4} (x - k) + \\sum_{k=1}^{3} k', inputs: [[1.5]] },
+  { src: 'ish(k) = \\sum_{k=k}^{3} k', inputs: [[1]] },
+  {
+    src: 'pwl(x) = {x > 0: \\sum_{k=1}^{1/x} k, \\sum_{k=1}^{2} k < x: 1, 0}',
+    inputs: [[0], [4], [0.5]],
+  },
+  { src: 'lpw(x) = \\sum_{k=1}^{3} {k > 1: \\sum_{j=1}^{k} j x, 0}', inputs: [[2]] },
 ];
 
 /** Every case to generate and run: loadFixtures() plus EXTRA, with unique ids. */

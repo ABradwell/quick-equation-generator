@@ -4,10 +4,14 @@ import {
   PREC,
   collectNames,
   docComment,
+  docLines,
+  lineComment,
+  type GenMeta,
   floatLiteral,
   isNegativeNumber,
   literalBound,
   makeFresh,
+  prepareDefinition,
   safeName,
   wrap,
 } from './shared.ts';
@@ -30,7 +34,8 @@ const UNARY: Record<string, string> = {
 const ind = (n: number): string => '\t'.repeat(n);
 const name = (n: string): string => safeName(n, RESERVED);
 
-export function generate(def: Definition): string {
+export function generate(input: Definition, meta?: GenMeta): string {
+  const { def, constants } = prepareDefinition(input, meta, (n) => name(n) !== n);
   const fresh = makeFresh(collectNames(def));
   let usesMath = false;
   const M = (fn: string): string => {
@@ -118,47 +123,74 @@ export function generate(def: Definition): string {
     }
   }
 
-  function emitLoop(node: LoopNode, lvl: number): Emitted {
-    const isSum = node.type === 'sum';
-    const acc = fresh(isSum ? 'sum' : 'prod');
-    const hi = fresh('hi');
-    const k = name(node.index);
-    const bound = (b: Node): string =>
-      literalBound(b) ?? `${M('Floor')}(${wrap(emit(b, lvl + 1), PREC.ADD)} + 0.5)`;
-    const body = emit(node.body, lvl + 2).s;
-    const s = [
-      'func() float64 {',
-      `${ind(lvl + 1)}${acc} := ${isSum ? '0.0' : '1.0'}`,
-      `${ind(lvl + 1)}${hi} := ${bound(node.to)}`,
-      `${ind(lvl + 1)}for ${k} := ${bound(node.from)}; ${k} <= ${hi}; ${k}++ {`,
-      `${ind(lvl + 2)}${acc} ${isSum ? '+=' : '*='} ${body}`,
-      `${ind(lvl + 1)}}`,
-      `${ind(lvl + 1)}return ${acc}`,
-      `${ind(lvl)}}()`,
-    ].join('\n');
-    return { s, p: PREC.ATOM };
+  // Statements emitted ahead of the expression being built, at the indent passed as `lvl`.
+  // Loops become statements here; the accumulator stands in for the loop in the expression.
+  let stmts: string[] = [];
+
+  /** Run `fn` with an empty statement list; returns its result and the statements it emitted. */
+  function inBlock<T>(fn: () => T): [T, string[]] {
+    const outer = stmts;
+    stmts = [];
+    try {
+      return [fn(), stmts];
+    } finally {
+      stmts = outer;
+    }
   }
 
+  function emitLoop(node: LoopNode, lvl: number): Emitted {
+    const isSum = node.type === 'sum';
+    const k = name(node.index);
+    // Bounds are emitted first: a loop inside a bound runs before this one.
+    const bound = (b: Node): string =>
+      literalBound(b) ?? `${M('Floor')}(${wrap(emit(b, lvl), PREC.ADD)} + 0.5)`;
+    const from = bound(node.from);
+    const to = bound(node.to);
+    const acc = fresh(isSum ? 'sum' : 'prod');
+    const lines = stmts;
+    lines.push(`${ind(lvl)}${acc} := ${isSum ? '0.0' : '1.0'}`);
+    let hi = to;
+    if (literalBound(node.to) === null) {
+      hi = fresh('hi');
+      lines.push(`${ind(lvl)}${hi} := ${to}`);
+    }
+    const [body, inner] = inBlock(() => emit(node.body, lvl + 1).s);
+    lines.push(
+      `${ind(lvl)}for ${k} := ${from}; ${k} <= ${hi}; ${k}++ {`,
+      ...inner,
+      `${ind(lvl + 1)}${acc} ${isSum ? '+=' : '*='} ${body}`,
+      `${ind(lvl)}}`,
+    );
+    return { s: acc, p: PREC.ATOM };
+  }
+
+  // A loop inside a case stays inside that case's branch, so it only runs when the branch is taken.
   function emitPiecewise(node: PiecewiseNode, lvl: number): Emitted {
     const lines = ['func() float64 {'];
     for (const c of node.cases) {
-      lines.push(`${ind(lvl + 1)}if ${emit(c.cond, lvl + 1).s} {`);
-      lines.push(`${ind(lvl + 2)}return ${emit(c.value, lvl + 2).s}`);
-      lines.push(`${ind(lvl + 1)}}`);
+      const [cond, condStmts] = inBlock(() => emit(c.cond, lvl + 1).s);
+      lines.push(...condStmts, `${ind(lvl + 1)}if ${cond} {`);
+      const [value, valueStmts] = inBlock(() => emit(c.value, lvl + 2).s);
+      lines.push(...valueStmts, `${ind(lvl + 2)}return ${value}`, `${ind(lvl + 1)}}`);
     }
-    const other = node.otherwise ? emit(node.otherwise, lvl + 1).s : `${M('NaN')}()`;
-    lines.push(`${ind(lvl + 1)}return ${other}`, `${ind(lvl)}}()`);
+    const [other, otherStmts] = inBlock(() =>
+      node.otherwise ? emit(node.otherwise, lvl + 1).s : `${M('NaN')}()`,
+    );
+    lines.push(...otherStmts, `${ind(lvl + 1)}return ${other}`, `${ind(lvl)}}()`);
     return { s: lines.join('\n'), p: PREC.ATOM };
   }
 
   const fname = name(def.name);
   const params = def.params.map(name);
-  const body = emit(def.body, 1).s;
+  const [body, bodyStmts] = inBlock(() => emit(def.body, 1).s);
   const sig = params.length ? `${params.join(', ')} float64` : '';
   return [
     usesMath ? 'import "math"\n\n' : '',
-    `// ${docComment(fname, params)}\n`,
+    ...constants.map((c) => `const ${c.name} = ${floatLiteral(c.value)} // ${c.about}\n`),
+    constants.length ? '\n' : '',
+    `${lineComment('//', docLines(def, meta, fname, params, 'plain') ?? [docComment(fname, params)])}\n`,
     `func ${fname}(${sig}) float64 {\n`,
+    ...bodyStmts.map((l) => `${l}\n`),
     `${ind(1)}return ${body}\n`,
     '}',
   ].join('');

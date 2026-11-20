@@ -1,6 +1,7 @@
 import { parseEquation, parseValue, ParseError } from './lib/parser.ts';
 import { evaluate } from './lib/evaluate.ts';
 import { LANGUAGES } from './lib/generators/index.ts';
+import type { GenMeta } from './lib/generators/shared.ts';
 import { renderDefinition, renderIdentifier, escapeHtml as esc } from './lib/render.ts';
 import { highlight } from './lib/highlight.ts';
 import { createEditor } from './lib/editor/view.ts';
@@ -9,6 +10,7 @@ import type { Definition } from './lib/ast.ts';
 import { createPalette } from './lib/editor/palette.ts';
 import { isIncomplete } from './lib/editor/util.ts';
 import { createGraph, createContour, iterationCost, fmtValue } from './lib/graph.ts';
+import { NOTEBOOK_ENTRIES } from './lib/notebook/data.ts';
 import { createNotebook } from './lib/notebook/view.ts';
 import type { Notebook } from './lib/notebook/view.ts';
 
@@ -398,10 +400,19 @@ function setLang(key: LangKey): void {
   if (state.def) renderCode();
 }
 
+/** Doc comment inputs: the equation, plus notebook details only while the editor matches an entry exactly. */
+function genMeta(): GenMeta {
+  const source = currentText();
+  const entry = NOTEBOOK_ENTRIES.find((e) => e.src === source);
+  if (!entry) return { source };
+  const { title, about, vars, example, expect, exampleNote, constants } = entry;
+  return { source, title, about, vars, example, expect, exampleNote, constants };
+}
+
 function renderCode() {
   const lang = LANGUAGES[state.lang];
   try {
-    const text = String(lang.generate(state.def!) ?? '');
+    const text = String(lang.generate(state.def!, genMeta()) ?? '');
     state.codeText = text;
     els.code.innerHTML = highlight(text, state.lang);
     els.copy.disabled = !text;

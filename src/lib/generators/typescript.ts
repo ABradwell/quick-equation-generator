@@ -2,6 +2,15 @@
 // Results follow src/lib/evaluate.ts; NaN and Infinity behave as in the reference.
 
 import type { BinNode, CallNode, Definition, LoopNode, Node, PiecewiseNode } from '../ast.ts';
+import {
+  blockComment,
+  collectNames,
+  docLines,
+  makeFresh,
+  prepareDefinition,
+  usedVars,
+  type GenMeta,
+} from './shared.ts';
 
 // Precedence, loosest to tightest, following JavaScript's grammar.
 const P = { COND: 0, OR: 1, AND: 2, CMP: 3, ADD: 4, MUL: 5, UNARY: 6, POW: 7, ATOM: 8 };
@@ -165,42 +174,104 @@ function call({ fn, args }: CallNode): string {
   return `Math.${name}(${parts.join(', ')})`;
 }
 
-/** Integer loop bound Math.floor(x + 0.5), with numeric literals folded. */
-function bound(node: Node): string {
-  if (node.type === 'num') return String(Math.floor(node.value + 0.5));
-  return `Math.floor(${text(node)} + 0.5)`;
+/** Statements being collected for the block currently being emitted, and their indent. */
+interface Block {
+  lines: string[];
+  lvl: number;
+}
+
+const ind = (n: number): string => '    '.repeat(n);
+
+// State for the generate() call in progress. Loops are emitted as statements into `block`,
+// and the loop's accumulator stands in for it in the enclosing expression.
+let block: Block = { lines: [], lvl: 1 };
+let fresh: (base: string) => string = (base) => base;
+
+/** Run `fn` with a fresh statement block at indent `lvl`; returns its result and statements. */
+function inBlock<T>(lvl: number, fn: () => T): [T, string[]] {
+  const outer = block;
+  block = { lines: [], lvl };
+  try {
+    return [fn(), block.lines];
+  } finally {
+    block = outer;
+  }
+}
+
+/** Constant loop bound floor(x + 0.5) as a literal, or null when `node` is not a number. */
+function literalBound(node: Node): string | null {
+  return node.type === 'num' && Number.isFinite(node.value)
+    ? String(Math.floor(node.value + 0.5))
+    : null;
 }
 
 function loop(node: LoopNode): string {
-  // Scratch names start with "_", which the parser never produces, so they cannot clash with
-  // parameters or with an index in an enclosing sum.
-  const index = ident(node.index);
+  const { lines, lvl } = block;
   const isSum = node.type === 'sum';
-  const init = isSum ? 0 : 1;
-  const op = isSum ? '+=' : '*=';
-  return (
-    `(() => { const _lo = ${bound(node.from)}, _hi = ${bound(node.to)}; let _acc = ${init}; ` +
-    `for (let ${index} = _lo; ${index} <= _hi; ${index}++) _acc ${op} ${text(node.body)}; ` +
-    'return _acc; })()'
+  const index = ident(node.index);
+  // Bounds are emitted first: a loop inside a bound runs before this one.
+  const from = literalBound(node.from) ?? `Math.floor(${text(node.from)} + 0.5)`;
+  const to = literalBound(node.to) ?? `Math.floor(${text(node.to)} + 0.5)`;
+  const acc = fresh(isSum ? 'sum' : 'prod');
+  lines.push(`${ind(lvl)}let ${acc} = ${isSum ? 0 : 1};`);
+  // `let k = <from>` cannot read an outer k (temporal dead zone), so such a bound gets a name.
+  let lo = from;
+  if (literalBound(node.from) === null && usedVars(node.from).has(node.index)) {
+    lo = fresh('lo');
+    lines.push(`${ind(lvl)}const ${lo} = ${from};`);
+  }
+  let hi = to;
+  if (literalBound(node.to) === null) {
+    hi = fresh('hi');
+    lines.push(`${ind(lvl)}const ${hi} = ${to};`);
+  }
+  const [body, stmts] = inBlock(lvl + 1, () => text(node.body));
+  lines.push(
+    `${ind(lvl)}for (let ${index} = ${lo}; ${index} <= ${hi}; ${index}++) {`,
+    ...stmts,
+    `${ind(lvl + 1)}${acc} ${isSum ? '+=' : '*='} ${body};`,
+    `${ind(lvl)}}`,
   );
+  return acc;
+}
+
+/**
+ * One condition or value of a piecewise. A loop inside it must only run when the branch is
+ * reached, so its statements go in an immediately invoked arrow function instead of the
+ * enclosing block.
+ */
+function arm(node: Node): string {
+  const lvl = block.lvl;
+  const [code, stmts] = inBlock(lvl + 1, () => text(node));
+  if (!stmts.length) return code;
+  return ['(() => {', ...stmts, `${ind(lvl + 1)}return ${code};`, `${ind(lvl)}})()`].join('\n');
 }
 
 function piecewise({ cases, otherwise }: PiecewiseNode): string {
-  let out = otherwise ? text(otherwise) : 'NaN';
-  for (let i = cases.length - 1; i >= 0; i--) {
-    out = `${text(cases[i].cond)} ? ${text(cases[i].value)} : ${out}`;
+  // Arms are emitted in source order so scratch names number in reading order.
+  const arms = cases.map((c) => [arm(c.cond), arm(c.value)]);
+  let out = otherwise ? arm(otherwise) : 'NaN';
+  for (let i = arms.length - 1; i >= 0; i--) {
+    out = `${arms[i][0]} ? ${arms[i][1]} : ${out}`;
   }
   return `(${out})`;
 }
 
-export function generate(def: Definition): string {
+export function generate(input: Definition, meta?: GenMeta): string {
+  const { def, constants } = prepareDefinition(input, meta, (n) => ident(n) !== n);
   const params = def.params.map((p) => `${ident(p)}: number`).join(', ');
+  fresh = makeFresh(collectNames(def));
+  const [result, stmts] = inBlock(1, () => text(def.body));
   return [
-    '/**',
-    ` * Evaluate ${def.name}(${def.params.join(', ')}).`,
-    ' */',
+    ...constants.flatMap((c) => [`const ${c.name} = ${c.value}; // ${c.about}`, '']),
+    blockComment(
+      docLines(def, meta, ident(def.name), def.params.map(ident), 'jsdoc') ?? [
+        `Evaluate ${def.name}(${def.params.join(', ')}).`,
+      ],
+    ),
     `export function ${ident(def.name)}(${params}): number {`,
-    `    return ${text(def.body)};`,
+    ...stmts,
+    `    return ${result};`,
     '}',
     '',
   ].join('\n');
